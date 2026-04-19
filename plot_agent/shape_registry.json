@@ -1,0 +1,53 @@
+{
+  "_comment": "高频 drawio shape 白名单 - 给 LLM 限定可选集, 避免选错或编造",
+  "service": {
+    "default": "rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf",
+    "aws_ec2": "shape=mxgraph.aws4.ec2;html=1",
+    "aws_lambda": "shape=mxgraph.aws4.lambda;html=1",
+    "gcp_cloud_run": "shape=mxgraph.gcp2.cloud_run;html=1",
+    "k8s_pod": "shape=mxgraph.kubernetes.pod;html=1"
+  },
+  "database": {
+    "default": "shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656",
+    "mysql": "shape=mxgraph.rack.oracle.oracle_database;html=1",
+    "postgres": "shape=cylinder3;html=1;fillColor=#316192",
+    "mongo": "shape=cylinder3;html=1;fillColor=#4db33d",
+    "aws_rds": "shape=mxgraph.aws4.rds;html=1",
+    "aws_dynamodb": "shape=mxgraph.aws4.dynamodb;html=1"
+  },
+  "cache": {
+    "redis": "shape=cylinder3;html=1;fillColor=#dc382d;strokeColor=#aa0000",
+    "memcached": "shape=cylinder3;html=1;fillColor=#888"
+  },
+  "queue": {
+    "kafka": "shape=mxgraph.flowchart.manual_input;html=1;fillColor=#231f20",
+    "rabbitmq": "shape=mxgraph.flowchart.manual_input;html=1;fillColor=#ff6600",
+    "sqs": "shape=mxgraph.aws4.simple_queue_service;html=1",
+    "default": "shape=mxgraph.flowchart.manual_input;html=1;fillColor=#ffe6cc;strokeColor=#d79b00"
+  },
+  "storage": {
+    "aws_s3": "shape=mxgraph.aws4.simple_storage_service;html=1",
+    "gcs": "shape=mxgraph.gcp2.cloud_storage;html=1",
+    "default": "shape=mxgraph.aws4.simple_storage_service;html=1"
+  },
+  "ui": {
+    "browser": "shape=mxgraph.mscae.general.internet;html=1",
+    "mobile": "shape=mxgraph.mockup.containers.iPhone;html=1",
+    "default": "rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366"
+  },
+  "gateway": {
+    "aws_api_gateway": "shape=mxgraph.aws4.api_gateway;html=1",
+    "nginx": "shape=mxgraph.networking.wireless_router;html=1",
+    "default": "shape=mxgraph.networking.wireless_router;html=1"
+  },
+  "model": {
+    "default": "rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6",
+    "openai": "shape=mxgraph.general.openai;html=1"
+  },
+  "user": {
+    "default": "shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top"
+  },
+  "function": {
+    "default": "rhombus;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6"
+  }
+}
