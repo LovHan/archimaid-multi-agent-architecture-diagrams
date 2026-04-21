@@ -1,6 +1,7 @@
-"""冒烟测试：pipeline 可编译、走 stubbed LLM 跑完整条链、产物写到 out_dir。
+"""Smoke tests: the pipeline compiles, runs end-to-end against a stubbed LLM, and writes artifacts.
 
-LLM 调用由 conftest.py 的 stub_llm fixture 拦截——不需要 OPENAI_API_KEY。
+LLM calls are intercepted by the ``stub_llm`` fixture in ``conftest.py`` so no
+``OPENAI_API_KEY`` is required.
 """
 
 from __future__ import annotations
@@ -15,11 +16,11 @@ from plot_agent.memory import make_checkpointer, make_store
 
 
 BRD_SAMPLE = """
-做一个多租户 SaaS 表单平台：
-- 客户通过 Web 提交表单数据
-- 后端需要 webhook 推送到下游 CRM
-- 每个租户数据隔离
-- 上线在 Azure
+Build a multi-tenant SaaS form platform:
+- customers submit form data through the web
+- the backend pushes data downstream via webhooks to a CRM
+- per-tenant data isolation
+- target deployment: Azure
 """
 
 
@@ -57,7 +58,7 @@ def test_pipeline_with_memory(tmp_path):
 
 
 def test_executor_interaction(tmp_path):
-    """executors 之间通过 exec_scratch 互相留 note，说明交互发生了。"""
+    """Executors leave notes for each other in ``exec_scratch``; this proves they interacted."""
     app = build_brd_to_mermaid_pipeline()
     out = app.invoke(_state(BRD_SAMPLE, tmp_path))
     scratch = out.get("exec_scratch", {})
@@ -66,7 +67,8 @@ def test_executor_interaction(tmp_path):
 
 
 def test_llm_error_propagates(tmp_path, monkeypatch):
-    """LLM 彻底不可用时必须抛 LLMCallError，不再有静默 fallback。"""
+    """When the LLM is fully unavailable the pipeline must raise ``LLMCallError``,
+    never swallow it with a silent fallback."""
 
     def boom(*_a, **_kw):
         raise LLMCallError("simulated outage")

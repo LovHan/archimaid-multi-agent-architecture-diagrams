@@ -1,10 +1,11 @@
-"""plot-agent CLI 入口。
+"""plot-agent CLI entry point.
 
-子命令：
-  generate  跑完整 pipeline：BRD(.pdf|.txt|.md) → planner → executors → reviewer → mermaid → PNG
-  render    只把已有 .mmd 渲染成 PNG（kroki | mmdc）
+Subcommands:
+  generate  Run the full pipeline: BRD(.pdf|.txt|.md)
+            -> planner -> executors -> reviewer -> mermaid -> PNG
+  render    Render an existing .mmd file to PNG (kroki | mmdc)
 
-示例：
+Examples:
   plot-agent generate samples/databricks_brd.txt
   plot-agent generate brd.pdf --out-dir out/ --no-png
   plot-agent render out/diagram.mmd --out out/diagram.png --backend kroki
@@ -32,7 +33,8 @@ def _read_brd(path: Path) -> str:
             from pypdf import PdfReader
         except ImportError as exc:
             raise SystemExit(
-                "PDF 输入需要 pypdf:  poetry add pypdf   或改用 .txt/.md"
+                "PDF input requires pypdf. Install with `poetry install -E pdf` "
+                "(or `poetry add pypdf`), or pass a .txt/.md file instead."
             ) from exc
         return "\n".join((p.extract_text() or "") for p in PdfReader(str(path)).pages)
     return path.read_text(encoding="utf-8")
@@ -50,7 +52,7 @@ def _pretty(value, console: Console, title: str) -> None:
 def cmd_generate(args: argparse.Namespace) -> int:
     load_dotenv()
     if not os.environ.get("OPENAI_API_KEY"):
-        print("缺少 OPENAI_API_KEY，请在 .env 中配置。", file=sys.stderr)
+        print("OPENAI_API_KEY not set; configure it in .env", file=sys.stderr)
         return 2
 
     console = Console()
@@ -128,27 +130,30 @@ def cmd_render(args: argparse.Namespace) -> int:
 
 # ---------- entry ----------
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="plot-agent", description="BRD → Mermaid 多智能体 pipeline.")
-    parser.add_argument("-v", "--verbose", action="store_true", help="启用 DEBUG 日志")
+    parser = argparse.ArgumentParser(
+        prog="plot-agent",
+        description="BRD -> Mermaid multi-agent pipeline.",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="enable DEBUG logging")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    g = sub.add_parser("generate", help="跑完整 pipeline 生成图与摘要")
-    g.add_argument("brd", help="BRD 文件路径（.pdf/.txt/.md）")
-    g.add_argument("--out-dir", default="out", help="输出目录（默认 out/）")
+    g = sub.add_parser("generate", help="run the full pipeline to produce diagram and summary")
+    g.add_argument("brd", help="path to the BRD file (.pdf/.txt/.md)")
+    g.add_argument("--out-dir", default="out", help="output directory (default: out/)")
     g.add_argument("--thread-id", default="cli-run-1")
     g.add_argument("--project-id", default="default")
-    g.add_argument("--no-png", action="store_true", help="不生成 PNG，仅产 .mmd 与 .md")
+    g.add_argument("--no-png", action="store_true", help="skip PNG; only emit .mmd and .md")
     g.add_argument(
         "--png-backend",
         choices=["auto", "kroki", "mmdc"],
         default="auto",
-        help="PNG 渲染后端（默认 auto = kroki 失败回落 mmdc）",
+        help="PNG render backend (default: auto = kroki then mmdc fallback)",
     )
     g.set_defaults(func=cmd_generate)
 
-    r = sub.add_parser("render", help="把已有的 .mmd 渲染成 PNG")
-    r.add_argument("mmd", help="mermaid 源文件路径")
-    r.add_argument("--out", help="PNG 输出路径（默认与源同名换 .png）")
+    r = sub.add_parser("render", help="render an existing .mmd file to PNG")
+    r.add_argument("mmd", help="path to the mermaid source file")
+    r.add_argument("--out", help="PNG output path (default: same name with .png suffix)")
     r.add_argument(
         "--backend",
         choices=["auto", "kroki", "mmdc"],

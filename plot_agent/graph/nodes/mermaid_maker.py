@@ -1,8 +1,8 @@
-"""MermaidMaker Agent：plan + designs → MermaidIR（结构化 JSON）。
+"""MermaidMaker agent: plan + designs -> MermaidIR (structured JSON).
 
-为什么拆成 IR 而不是直接出 mermaid 文本？
-- IR 可 schema 校验、可 diff、可被其他后端（graphviz、excalidraw）复用；
-- 文本生成放在 schemas.MermaidIR.to_mermaid()，单一职责。
+Why an IR instead of emitting Mermaid text directly?
+- The IR can be schema-validated, diffed, and reused by other backends (graphviz, excalidraw, ...).
+- Text generation lives in ``schemas.MermaidIR.to_mermaid()``, keeping responsibilities single.
 """
 
 from __future__ import annotations

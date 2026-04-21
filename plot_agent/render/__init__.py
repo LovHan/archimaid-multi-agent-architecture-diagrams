@@ -1,4 +1,4 @@
-"""图片渲染后端：把 mermaid 文本变成 PNG。"""
+"""Image render backends: turn mermaid text into a PNG."""
 
 from plot_agent.render.png import RenderError, render_png
 

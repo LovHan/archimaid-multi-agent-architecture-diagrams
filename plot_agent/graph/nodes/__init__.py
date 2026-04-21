@@ -1,1 +1,3 @@
-"""节点函数集合。每个节点都是 (state) -> dict 形式，返回要合并进 state 的增量。"""
+"""Node functions.  Each node has the signature ``(state) -> dict``;
+the dict is merged back into the state via the reducers in ``state.py``.
+"""

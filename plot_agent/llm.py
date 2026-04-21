@@ -1,9 +1,12 @@
-"""LLM 调用封装（Harness 层）。
+"""LLM call wrapper (the harness layer).
 
-职责：
-- `call_structured`：LLM → JSON → Pydantic schema；解析失败做 repair；网络瞬态错误做指数退避重试。
-- 仍然失败 → 抛 `LLMCallError`，由上层（节点 / runner）决定如何处理。**不内置任何硬编码业务 fallback**。
-- 每个 agent 通过 `model_env` 指向 .env 中的键（PLANNER_MODEL / CRITIC_MODEL ...）。
+Responsibilities:
+- ``call_structured``: LLM -> JSON -> Pydantic schema; on parse failure run a repair loop;
+  on transient network errors retry with exponential backoff.
+- If still failing, raise ``LLMCallError`` and let the caller (node / runner) decide.
+  **No hard-coded business fallbacks live in this package.**
+- Each agent picks its model via ``model_env`` pointing at an env var key
+  (``PLANNER_MODEL`` / ``CRITIC_MODEL`` / ...).
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ _NETWORK_BACKOFF = 2.0
 
 
 class LLMCallError(RuntimeError):
-    """LLM 调用或 schema 解析最终失败。"""
+    """The LLM call or schema parsing ultimately failed."""
 
 
 def _resolve_model(model_env: str) -> str:
@@ -43,7 +46,7 @@ def _resolve_model(model_env: str) -> str:
 
 
 def _invoke_llm(system: str, user: str, *, model_env: str = _DEFAULT_MODEL_ENV) -> str:
-    """调用 OpenAI Chat Completions，要求 JSON 输出；瞬态网络错误指数退避重试。"""
+    """Call OpenAI Chat Completions, ask for JSON, retry on transient network errors."""
     from openai import APIConnectionError, APITimeoutError, BadRequestError, OpenAI, RateLimitError
 
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -88,7 +91,7 @@ def call_structured(
     max_repair: int = 2,
     model_env: str = _DEFAULT_MODEL_ENV,
 ) -> T:
-    """LLM → JSON → schema；解析失败重试 max_repair 次，仍失败抛 LLMCallError。"""
+    """LLM -> JSON -> schema.  Retries up to ``max_repair`` times, otherwise raises ``LLMCallError``."""
     last_err: Exception | None = None
     attempt_prompt = user_prompt
     for attempt in range(max_repair + 1):

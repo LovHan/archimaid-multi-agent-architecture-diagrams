@@ -1,19 +1,21 @@
-"""BRD → Mermaid pipeline 主图组装。
+"""Top-level assembly of the BRD -> Mermaid pipeline graph.
 
-拓扑：
+Topology::
+
     START
-      │
-      ▼
-    planner ──▶ executors(subgraph) ──▶ reviewer
-                     ▲                      │
-                     └──── not ok & retry ──┘
-                                            │ ok | 超过额度
-                                            ▼
-                                      mermaid_maker ──▶ mermaid_renderer ──▶ END
+      |
+      v
+    planner --> executors (subgraph) --> reviewer
+                       ^                     |
+                       +----- not ok & retry +
+                                             | ok | review budget exhausted
+                                             v
+                                       mermaid_maker --> mermaid_renderer --> END
 
-Memory：
-- checkpointer：thread 内断点续跑；可选。
-- store：跨 thread 长期记忆（项目级），通过 MultiAgentState.project_id 访问。
+Memory:
+- checkpointer: per-thread, resumable runs (optional).
+- store:        cross-thread project-level long-term memory, addressed by
+                ``MultiAgentState.project_id``.
 """
 
 from __future__ import annotations
@@ -30,9 +32,10 @@ from plot_agent.state import MultiAgentState
 
 
 def build_brd_to_mermaid_pipeline(*, checkpointer=None, store=None):
-    """返回已 compile 的 pipeline graph。
+    """Return a compiled pipeline graph.
 
-    用法：
+    Example::
+
         from plot_agent import build_brd_to_mermaid_pipeline
         from plot_agent.memory import make_checkpointer, make_store
 
@@ -41,7 +44,7 @@ def build_brd_to_mermaid_pipeline(*, checkpointer=None, store=None):
             store=make_store(),
         )
         out = app.invoke(
-            {"brd": "我们要做一个多租户 SaaS..."},
+            {"brd": "We are building a multi-tenant SaaS..."},
             {"configurable": {"thread_id": "t1"}},
         )
         print(out["mermaid_code"])
@@ -69,5 +72,5 @@ def build_brd_to_mermaid_pipeline(*, checkpointer=None, store=None):
     return g.compile(checkpointer=checkpointer, store=store)
 
 
-# 向后兼容别名
+# Backward-compatible alias.
 build_multi_agent_graph = build_brd_to_mermaid_pipeline

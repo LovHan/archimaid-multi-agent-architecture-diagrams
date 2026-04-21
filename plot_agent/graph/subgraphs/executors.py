@@ -1,11 +1,14 @@
-"""Executor 子图：多 role 轮询协作。
+"""Executor subgraph: multi-role round-robin collaboration.
 
-拓扑：
-    START → frontend → backend → data → devops → security → turn_gate
-    turn_gate: turn < MAX_TURNS → frontend（再跑一轮，此时每个 role 都能看到其他 role 上轮的结果）
-                else → END
+Topology::
 
-这就实现了"executors 相互交互"：顺序 + 多轮 + 共享 state.designs & exec_scratch。
+    START -> frontend -> backend -> data -> devops -> security -> turn_gate
+    turn_gate: turn < MAX_TURNS -> frontend (run another round; each role can now see
+                                              the others' updates from the previous round)
+               else            -> END
+
+This is how the executors "interact": sequential traversal, multiple rounds, and shared
+``state.designs`` / ``state.exec_scratch``.
 """
 
 from __future__ import annotations

@@ -1,9 +1,10 @@
-"""Memory 装配：短期（thread 内）+ 长期（跨 thread）。
+"""Memory wiring: short-term (within a thread) + long-term (across threads).
 
-- checkpointer：InMemorySaver。生产可换 SqliteSaver / PostgresSaver。
-- store：InMemoryStore。存"项目级"长期记忆（过往 BRD、lessons learned、命名规范）。
+- checkpointer: ``InMemorySaver`` by default; swap in ``SqliteSaver`` / ``PostgresSaver`` in production.
+- store:        ``InMemoryStore`` by default; holds project-level long-term memory
+                (past BRDs, lessons learned, naming conventions).
 
-用法：
+Usage:
     from plot_agent.memory import make_checkpointer, make_store
     app = build_brd_to_mermaid_pipeline(checkpointer=make_checkpointer(), store=make_store())
 """

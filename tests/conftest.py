@@ -1,6 +1,7 @@
-"""测试固件：拦截 `plot_agent.llm._invoke_llm`，按 schema 路由返回预置 JSON。
+"""Test fixture: monkeypatch ``plot_agent.llm._invoke_llm`` and route returns by schema.
 
-这样 CI 无需 OPENAI_API_KEY，也不会把任何业务偏见硬编码进生产代码路径。
+This way CI does not need ``OPENAI_API_KEY``, and we never bake any business-flavoured
+fallback data into the production package.
 """
 
 from __future__ import annotations
@@ -69,7 +70,7 @@ _IR_JSON: dict[str, Any] = {
 
 
 def _fake_invoke_llm(system: str, user: str, *, model_env: str = "PLANNER_MODEL") -> str:
-    """根据 system prompt 里的关键词判断轮到哪个 agent，返回对应 JSON 字符串。"""
+    """Pick a stub JSON response by spotting agent-specific keywords in the system prompt."""
     s = system.lower()
     if "turn the brd into" in s:
         return json.dumps(_PLAN_JSON)
@@ -77,7 +78,7 @@ def _fake_invoke_llm(system: str, user: str, *, model_env: str = "PLANNER_MODEL"
         return json.dumps(_REVIEW_JSON)
     if "mermaid flowchart ir" in s:
         return json.dumps(_IR_JSON)
-    # executor role：prompt 里包含 "you are the {role} architect"
+    # Executor roles: prompts contain "you are the {role} architect".
     for role in ("frontend", "backend", "data", "devops", "security"):
         if f"you are the {role} architect" in s:
             return json.dumps(_design_json(role))
@@ -86,6 +87,6 @@ def _fake_invoke_llm(system: str, user: str, *, model_env: str = "PLANNER_MODEL"
 
 @pytest.fixture(autouse=True)
 def stub_llm(monkeypatch):
-    """默认给所有测试打上 LLM stub；需要真实 LLM 的测试可用 monkeypatch.undo。"""
+    """Apply the LLM stub to every test by default; opt out via ``monkeypatch.undo()``."""
     monkeypatch.setattr("plot_agent.llm._invoke_llm", _fake_invoke_llm)
     yield

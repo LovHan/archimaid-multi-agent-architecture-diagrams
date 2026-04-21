@@ -1,14 +1,17 @@
-"""共享图状态（BRD → Mermaid pipeline）。
+"""Shared graph state for the BRD -> Mermaid pipeline.
 
-Harness 原则：state 是所有节点的单一事实源；每个字段都有明确 owner。
-- brd：输入业务需求文档。
-- plan：PlannerAgent 产出的 TechPlan dict（含 self-Q&A CoT）。
-- designs：role -> ComponentDesign dict，由 executors 迭代更新。
-- exec_scratch：executors 子图内的共享便签，用于角色之间互相看到对方的 note。
-- review：ReviewReport dict。review_rounds：已进行的审阅轮数。
-- mermaid_ir / mermaid_code / summary_md：最终产物。
-- trace：可观测性日志行（append-only）。
-- thread_id / project_id：memory 维度（thread=单次对话，project=跨会话长期记忆）。
+Harness rule: state is the single source of truth across nodes; every field has a clear owner.
+
+- brd:           raw BRD text supplied by the caller.
+- plan:          TechPlan dict produced by the planner agent (includes a self-Q&A CoT).
+- designs:       role -> ComponentDesign dict, iteratively updated by the executor subgraph.
+- exec_scratch:  shared scratchpad inside the executor subgraph so roles can see each
+                 other's notes (the "interaction" surface).
+- review:        ReviewReport dict.  review_rounds: how many review rounds have run.
+- mermaid_ir / mermaid_code / summary_md: final artifacts.
+- trace:         append-only observability log lines.
+- thread_id / project_id: memory dimensions
+                          (thread = a single conversation, project = cross-thread long-term memory).
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ from langgraph.graph.message import add_messages
 
 
 def _merge_dict(old: dict | None, new: dict | None) -> dict:
-    """Reducer：浅合并 designs / scratchpad 等字典字段。"""
+    """Reducer: shallow-merge dict fields like designs / scratchpad."""
     return {**(old or {}), **(new or {})}
 
 

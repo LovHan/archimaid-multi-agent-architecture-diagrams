@@ -1,9 +1,11 @@
-"""Executor role 节点集合。每个 role 都是 (state) -> {designs: {<role>: {...}}, exec_scratch: {...}}。
+"""Executor role nodes.  Each role has the signature
+``(state) -> {designs: {<role>: {...}}, exec_scratch: {...}}``.
 
-Harness：
-- 每个 role 都读取 **全量** designs + plan + exec_scratch，这样能看到其他 role 已经做的决定 → 相互交互；
-- 输出只写自己那一块，防止写冲突；
-- 输出经 ComponentDesign schema 约束。
+Harness rules:
+- Every role reads the **full** designs + plan + exec_scratch, so it can see the
+  decisions other roles already made -> this is the interaction surface.
+- A role only writes back its own slot, avoiding write conflicts.
+- Output is constrained by the ``ComponentDesign`` schema.
 """
 
 from plot_agent.graph.subgraphs.roles.backend import backend_node

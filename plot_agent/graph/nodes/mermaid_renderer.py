@@ -1,8 +1,10 @@
-"""MermaidRenderer：IR → mermaid 文本 + summary.md（+可选 PNG）。
+"""MermaidRenderer: IR -> mermaid text + summary.md (+ optional PNG).
 
-- 永远写 .mmd 和 summary.md（纯 Python，零外部依赖）。
-- 当 state["render_png"] = True 时，调 plot_agent.render.png（默认 kroki，自动 fallback mmdc）。
-  渲染失败不会抛错冒泡——属于"展示层 soft fail"，记入 trace 即可，不要污染 graph。
+- Always writes ``diagram.mmd`` and ``summary.md`` (pure Python, no external deps).
+- When ``state["render_png"]`` is truthy, calls ``plot_agent.render.png``
+  (default: kroki, auto-fallback to mmdc).
+  PNG failures are intentionally a soft-fail at the presentation layer: we record the
+  error in ``trace`` and let the graph proceed, instead of poisoning the run.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ def _build_summary(state: MultiAgentState, mermaid_code: str) -> str:
     lines = [
         "# Solution Summary",
         "",
-        f"**Plan summary**：{plan.get('summary', '')}",
+        f"**Plan summary**: {plan.get('summary', '')}",
         "",
         "## Self-Q&A Chain",
     ]

@@ -1,4 +1,4 @@
-"""plot_agent：BRD → Mermaid 多智能体 pipeline（LangGraph）。"""
+"""plot_agent: a LangGraph multi-agent pipeline that turns a BRD into a Mermaid diagram."""
 
 from plot_agent.graph.builder import (
     build_brd_to_mermaid_pipeline,

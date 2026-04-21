@@ -40,7 +40,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 直接喂 .pdf 作为 BRD 时启用
+# Enable to feed .pdf files directly as BRDs.
 pdf = ["pypdf>=4.0,<6.0"]
 
 [project.scripts]
@@ -76,7 +76,7 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
 ignore = [
-    "E501",  # line-too-long (由 formatter 管)
+    "E501",  # line-too-long (handled by the formatter)
     "B008",  # default arg function call
 ]
 

@@ -1,4 +1,4 @@
-"""Planner Agent：读 BRD → 自问自答 CoT → TechPlan。"""
+"""Planner agent: BRD -> Self-Q&A chain-of-thought -> TechPlan."""
 
 from __future__ import annotations
 

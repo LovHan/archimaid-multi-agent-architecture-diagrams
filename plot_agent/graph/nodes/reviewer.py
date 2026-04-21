@@ -1,4 +1,4 @@
-"""Reviewer Agent：审阅 plan + designs 的整体可行性。"""
+"""Reviewer agent: check the overall feasibility of plan + designs."""
 
 from __future__ import annotations
 

@@ -1,1 +1,1 @@
-"""子图集合。"""
+"""Subgraph package."""

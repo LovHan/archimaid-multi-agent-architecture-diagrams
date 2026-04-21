@@ -1,9 +1,10 @@
-"""Pydantic schemas：harness 层对 LLM 输出的强约束，但对"结构更丰富的合理输出"做了软化。
+"""Pydantic schemas: strict harness contracts for LLM output, with mild softening.
 
-策略：
-- 字段优先字符串；若 LLM 返回 dict/list，用 field_validator 做无损的 JSON 序列化保留原信息。
-- qa_chain 子项接受 QAPair / dict / 纯字符串，自动归一化。
-- summary 缺省也能容忍（repair 阶段模型经常忘写）。
+Strategy:
+- Prefer plain string fields; if the LLM returns a dict/list, ``field_validator`` losslessly
+  serializes it to JSON to preserve information.
+- ``qa_chain`` items accept QAPair / dict / plain string; we normalize.
+- ``summary`` is allowed to be empty (the model often forgets it during the repair pass).
 """
 
 from __future__ import annotations

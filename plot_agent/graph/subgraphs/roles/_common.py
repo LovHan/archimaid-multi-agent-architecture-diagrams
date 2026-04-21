@@ -1,4 +1,6 @@
-"""Role executor 的公共 helper：构建 prompt / 组装 context / 调 LLM / 统一返回。"""
+"""Shared helpers for the executor role nodes:
+build the prompt, assemble the context slice, call the LLM, and shape the return value.
+"""
 
 from __future__ import annotations
 

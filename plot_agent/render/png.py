@@ -1,10 +1,12 @@
-"""Mermaid → PNG 渲染。
+"""Mermaid -> PNG rendering.
 
-后端优先级：
-1. `kroki`：HTTP POST 到 https://kroki.io/mermaid/png（默认；零本地依赖、需要外网）。
-2. `mmdc` ：本地 `@mermaid-js/mermaid-cli`（无外网时用；`npm i -g @mermaid-js/mermaid-cli` 安装）。
+Backend priority:
+1. ``kroki``: HTTP POST to https://kroki.io/mermaid/png (default; zero local install, needs network).
+2. ``mmdc`` : local ``@mermaid-js/mermaid-cli`` (offline use;
+              install with ``npm i -g @mermaid-js/mermaid-cli``).
 
-自动模式（默认）：先试 Kroki，失败回落 mmdc；都不行抛 RenderError。
+The ``auto`` mode (default) tries Kroki first and falls back to mmdc;
+if both fail, ``RenderError`` is raised.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ KROKI_TIMEOUT = float(os.environ.get("KROKI_TIMEOUT", "30"))
 
 
 class RenderError(RuntimeError):
-    """PNG 渲染失败（所有后端都不可用 / 都报错）。"""
+    """PNG rendering failed (every backend was unavailable or returned an error)."""
 
 
 _UA = "plot-agent/0.1 (+https://github.com/LovHan/plot_agent)"
@@ -69,7 +71,7 @@ def _render_mmdc(mermaid_text: str, out_path: Path) -> bytes:
 
 
 def render_png(mermaid_text: str, out_path: Path, *, backend: Backend = "auto") -> Path:
-    """把 mermaid 文本写成 PNG。返回写入的 Path。"""
+    """Write ``mermaid_text`` to ``out_path`` as a PNG and return the path."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 

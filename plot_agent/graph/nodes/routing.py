@@ -1,4 +1,9 @@
-"""Reviewer 之后的条件路由：通过 → mermaid_maker；不通过 & 有额度 → 回 executor 子图。"""
+"""Conditional routing after the reviewer.
+
+- ok=true                                        -> mermaid_maker
+- ok=false & review_rounds < MAX_REVIEW_ROUNDS   -> back to the executor subgraph
+- ok=false & budget exhausted                    -> mermaid_maker (forward anyway)
+"""
 
 from __future__ import annotations
 
