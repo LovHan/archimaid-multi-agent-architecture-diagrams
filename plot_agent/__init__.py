@@ -1,3 +1,14 @@
-"""plot_agent: 分层 agent 驱动的架构图生成器"""
+"""plot_agent：BRD → Mermaid 多智能体 pipeline（LangGraph）。"""
 
-__version__ = "0.1.0"
+from plot_agent.graph.builder import (
+    build_brd_to_mermaid_pipeline,
+    build_multi_agent_graph,
+)
+
+__all__ = [
+    "build_brd_to_mermaid_pipeline",
+    "build_multi_agent_graph",
+    "__version__",
+]
+
+__version__ = "0.2.0"

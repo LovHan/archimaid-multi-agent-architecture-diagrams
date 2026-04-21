@@ -1,9 +1,9 @@
 [project]
 name = "plot-agent"
-version = "0.1.0"
-description = "Hierarchical multi-agent architecture diagram generator. Turn natural language into draw.io diagrams with layered planning + VLM self-reflection."
+version = "0.2.0"
+description = "BRD → Mermaid architecture diagram generator. A LangGraph multi-agent pipeline (planner / executors / reviewer / mermaid) with strict schemas, no silent fallbacks."
 authors = [
-    { name = "Ruohan Xiong" },
+    { name = "Richard Mocha" },
 ]
 license = "MIT"
 readme = "README.md"
@@ -11,12 +11,12 @@ requires-python = ">=3.10,<4.0"
 keywords = [
     "diagram",
     "architecture-diagram",
-    "drawio",
+    "mermaid",
+    "langgraph",
     "llm-agent",
-    "mcp",
     "multi-agent",
     "flowchart",
-    "vlm",
+    "brd",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -35,24 +35,16 @@ dependencies = [
     "python-dotenv>=1.0,<2.0",
     "rich>=13.0,<15.0",
     "pillow>=10.0,<12.0",
+    "langgraph (>=1.1.8,<2.0.0)",
+    "langchain-core (>=1.3.0,<2.0.0)",
 ]
 
 [project.optional-dependencies]
-# pygraphviz 需系统 graphviz (brew install graphviz / apt install graphviz-dev)
-# 不装时会自动 fallback 到 SimpleGridLayout
-graphviz = ["pygraphviz>=1.11,<2.0"]
-# MCP server 暴露为 Cursor/IDE tool
-mcp = ["mcp>=1.0,<2.0"]
-# 一把梭
-all = [
-    "pygraphviz>=1.11,<2.0",
-    "mcp>=1.0,<2.0",
-]
+# 直接喂 .pdf 作为 BRD 时启用
+pdf = ["pypdf>=4.0,<6.0"]
 
 [project.scripts]
 plot-agent = "plot_agent.cli:main"
-plot-agent-mcp = "plot_agent.mcp_server.server:run"
-plot-agent-eval = "plot_agent.eval:main"
 
 [project.urls]
 Homepage = "https://github.com/LovHan/plot_agent"
@@ -62,6 +54,7 @@ Issues = "https://github.com/LovHan/plot_agent/issues"
 
 # ---------- Poetry-specific ----------
 [tool.poetry]
+package-mode = true
 packages = [{ include = "plot_agent" }]
 
 [tool.poetry.group.dev.dependencies]
@@ -87,19 +80,15 @@ ignore = [
     "B008",  # default arg function call
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"plot_agent/tests/*" = ["E501"]
-# G / AGraph / pgv 都是 networkx / pygraphviz 社区长期约定, 不按 PEP8 小写
-"plot_agent/layout/graphviz_layout.py" = ["N806", "N803"]
-
 [tool.mypy]
 python_version = "3.10"
 strict = false
 ignore_missing_imports = true
 warn_unused_ignores = true
-files = ["plot_agent"]
+files = ["tests"]
 
 [tool.pytest.ini_options]
-testpaths = ["plot_agent/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
+pythonpath = ["."]

@@ -1,176 +1,171 @@
-"""plot-agent CLI - 命令行入口
+"""plot-agent CLI 入口。
 
-子命令:
-    plot-agent generate "<prompt>"       直接生成图
-    plot-agent plan "<prompt>"           只规划不渲染
-    plot-agent render <ir.json>          从 IR 文件直接渲染
-    plot-agent env                       检测环境
-    plot-agent smoke                     跑离线 smoke test
+子命令：
+  generate  跑完整 pipeline：BRD(.pdf|.txt|.md) → planner → executors → reviewer → mermaid → PNG
+  render    只把已有 .mmd 渲染成 PNG（kroki | mmdc）
+
+示例：
+  plot-agent generate samples/databricks_brd.txt
+  plot-agent generate brd.pdf --out-dir out/ --no-png
+  plot-agent render out/diagram.mmd --out out/diagram.png --backend kroki
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 import sys
 from pathlib import Path
+from typing import Sequence
 
 from dotenv import load_dotenv
-
-load_dotenv()
-
-
-def _cmd_generate(args: argparse.Namespace) -> int:
-    from .agent import ArchitectureAgent
-
-    agent = ArchitectureAgent(
-        enable_reflection=args.reflection,
-        max_reflection_rounds=args.max_rounds,
-    )
-    result = agent.generate(
-        user_prompt=args.prompt,
-        output_dir=args.out,
-        name=args.name,
-        direction=args.direction,
-        export_png=not args.no_png,
-    )
-    print(f"drawio: {result.drawio_path}")
-    if result.png_path:
-        print(f"png:    {result.png_path}")
-    print(
-        f"stats:  {len(result.ir.nodes)} nodes, "
-        f"{len(result.ir.edges)} edges, "
-        f"{len(result.ir.groups)} groups"
-    )
-
-    ir_path = Path(args.out) / f"{args.name}.ir.json"
-    ir_path.write_text(result.ir.model_dump_json(indent=2), encoding="utf-8")
-    print(f"ir:     {ir_path}")
-    return 0
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
 
 
-def _cmd_plan(args: argparse.Namespace) -> int:
-    from .agent import ArchitectureAgent
-
-    agent = ArchitectureAgent(enable_reflection=False)
-    result = agent.plan(args.prompt)
-    out = {
-        "task_plan": {
-            "architecture_type": result.task_plan.architecture_type.value,
-            "title": result.task_plan.title,
-            "core_intent": result.task_plan.core_intent,
-            "focus": result.task_plan.focus,
-        },
-        "ir": json.loads(result.ir.model_dump_json()),
-        "integrity_errors": result.integrity_errors,
-    }
-    print(json.dumps(out, ensure_ascii=False, indent=2))
-    return 0
-
-
-def _cmd_render(args: argparse.Namespace) -> int:
-    from .ir import GraphIR
-    from .layout import get_layout_engine
-    from .render import DrawioRenderer, PngExporter
-
-    ir = GraphIR.model_validate_json(Path(args.ir_path).read_text("utf-8"))
-    get_layout_engine(prefer="auto").layout(ir, direction=args.direction)
-
-    out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    drawio_path = out_dir / f"{args.name}.drawio"
-    DrawioRenderer().write(ir, drawio_path)
-    print(f"drawio: {drawio_path}")
-
-    if not args.no_png:
+def _read_brd(path: Path) -> str:
+    if path.suffix.lower() == ".pdf":
         try:
-            png_path = PngExporter().export(drawio_path)
-            print(f"png:    {png_path}")
-        except Exception as e:
-            print(f"[warn] PNG 导出失败: {e}")
-    return 0
+            from pypdf import PdfReader
+        except ImportError as exc:
+            raise SystemExit(
+                "PDF 输入需要 pypdf:  poetry add pypdf   或改用 .txt/.md"
+            ) from exc
+        return "\n".join((p.extract_text() or "") for p in PdfReader(str(path)).pages)
+    return path.read_text(encoding="utf-8")
 
 
-def _cmd_env(_: argparse.Namespace) -> int:
-    import os
-
-    from .layout import get_layout_engine
-    from .render import PngExporter
-
-    engine = type(get_layout_engine(prefer="auto")).__name__
-    png = PngExporter()
-    png_ok, png_method = png.available()
-
-    print("== plot_agent environment ==")
-    print(f"  API key set:    {bool(os.getenv('OPENAI_API_KEY'))}")
-    print(f"  base URL:       {os.getenv('OPENAI_BASE_URL') or '(openai default)'}")
-    print(f"  planner model:  {os.getenv('PLANNER_MODEL', 'gpt-4o')}")
-    print(f"  vlm model:      {os.getenv('VLM_MODEL', 'gpt-4o')}")
-    print(f"  layout engine:  {engine}")
-    print(f"  PNG export:     {'yes' if png_ok else 'no'} ({png_method})")
-    print(f"  local drawio:   {PngExporter.find_local_drawio() or '-'}")
-    print(f"  docker:         {'yes' if PngExporter.has_docker() else 'no'}")
-    return 0
+def _pretty(value, console: Console, title: str) -> None:
+    try:
+        dumped = json.dumps(value, ensure_ascii=False, indent=2, default=str)
+        console.print(Panel(Syntax(dumped, "json", word_wrap=True), title=title, expand=False))
+    except Exception:  # noqa: BLE001
+        console.print(Panel(str(value), title=title, expand=False))
 
 
-def _cmd_smoke(_: argparse.Namespace) -> int:
-    from .examples.manual_ir_smoke import main as smoke_main
+# ---------- subcommand: generate ----------
+def cmd_generate(args: argparse.Namespace) -> int:
+    load_dotenv()
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("缺少 OPENAI_API_KEY，请在 .env 中配置。", file=sys.stderr)
+        return 2
 
-    smoke_main()
-    return 0
-
-
-def _cmd_version(_: argparse.Namespace) -> int:
-    from . import __version__
-
-    print(f"plot-agent {__version__}")
-    return 0
-
-
-def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="plot-agent",
-        description="Hierarchical multi-agent architecture diagram generator",
+    console = Console()
+    brd_path = Path(args.brd)
+    brd_text = _read_brd(brd_path)
+    console.rule("[bold cyan]Input BRD")
+    console.print(brd_text.strip()[:1200] + ("..." if len(brd_text) > 1200 else ""))
+    console.print(
+        f"[dim]source={brd_path}, length={len(brd_text)} chars, "
+        f"planner={os.environ.get('PLANNER_MODEL')} critic={os.environ.get('CRITIC_MODEL')}[/]"
     )
-    sub = p.add_subparsers(dest="command", required=True)
 
-    g = sub.add_parser("generate", help="根据自然语言生成架构图")
-    g.add_argument("prompt", help="架构描述")
-    g.add_argument("--out", default="out", help="输出目录")
-    g.add_argument("--name", default="diagram", help="文件名前缀")
-    g.add_argument("--direction", default="TB", choices=["TB", "LR", "BT", "RL"])
-    g.add_argument("--reflection", action="store_true", help="启用分层反射")
-    g.add_argument("--max-rounds", type=int, default=3)
-    g.add_argument("--no-png", action="store_true", help="不导出 PNG")
-    g.set_defaults(func=_cmd_generate)
+    from plot_agent import build_brd_to_mermaid_pipeline
+    from plot_agent.memory import make_checkpointer, make_store
 
-    pl = sub.add_parser("plan", help="只规划不渲染")
-    pl.add_argument("prompt")
-    pl.set_defaults(func=_cmd_plan)
+    app = build_brd_to_mermaid_pipeline(
+        checkpointer=make_checkpointer(),
+        store=make_store(),
+    )
 
-    r = sub.add_parser("render", help="从 IR JSON 文件直接渲染 drawio")
-    r.add_argument("ir_path")
-    r.add_argument("--out", default="out")
-    r.add_argument("--name", default="from_ir")
-    r.add_argument("--direction", default="TB")
-    r.add_argument("--no-png", action="store_true")
-    r.set_defaults(func=_cmd_render)
+    init_state = {
+        "brd": brd_text,
+        "project_id": args.project_id,
+        "out_dir": args.out_dir,
+        "render_png": not args.no_png,
+        "png_backend": args.png_backend,
+    }
+    cfg = {"configurable": {"thread_id": args.thread_id}, "recursion_limit": 50}
 
-    e = sub.add_parser("env", help="检测运行环境")
-    e.set_defaults(func=_cmd_env)
+    for step in app.stream(init_state, cfg, stream_mode="updates"):
+        for node, update in step.items():
+            console.rule(f"[bold yellow]{node}")
+            for key, value in update.items():
+                if key == "messages":
+                    for m in value:
+                        name = getattr(m, "name", None) or m.__class__.__name__
+                        console.print(f"[green]{name}[/]: {m.content}")
+                elif key == "trace":
+                    for line in value:
+                        console.print(f"[dim]- {line}[/]")
+                elif key in {"plan", "designs", "review", "mermaid_ir", "exec_scratch"}:
+                    _pretty(value, console, key)
+                elif key in {"mermaid_code", "summary_md"}:
+                    console.print(Panel(value, title=key, expand=False))
+                else:
+                    console.print(f"{key}: {value}")
 
-    s = sub.add_parser("smoke", help="跑离线 smoke test (无需 API key)")
-    s.set_defaults(func=_cmd_smoke)
+    out_dir = Path(args.out_dir)
+    console.rule("[bold green]Done")
+    console.print(f"[bold]Mermaid:[/] {out_dir / 'diagram.mmd'}")
+    console.print(f"[bold]Summary:[/] {out_dir / 'summary.md'}")
+    if not args.no_png:
+        console.print(f"[bold]PNG:[/]     {out_dir / 'diagram.png'}")
+    return 0
 
-    v = sub.add_parser("version", help="打印版本号")
-    v.set_defaults(func=_cmd_version)
 
-    return p
+# ---------- subcommand: render ----------
+def cmd_render(args: argparse.Namespace) -> int:
+    from plot_agent.render import RenderError, render_png
+
+    src = Path(args.mmd)
+    if not src.exists():
+        print(f"file not found: {src}", file=sys.stderr)
+        return 2
+    out = Path(args.out) if args.out else src.with_suffix(".png")
+    text = src.read_text(encoding="utf-8")
+    try:
+        path = render_png(text, out, backend=args.backend)
+    except RenderError as exc:
+        print(f"render failed: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote {path}")
+    return 0
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = _build_parser()
+# ---------- entry ----------
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="plot-agent", description="BRD → Mermaid 多智能体 pipeline.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="启用 DEBUG 日志")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    g = sub.add_parser("generate", help="跑完整 pipeline 生成图与摘要")
+    g.add_argument("brd", help="BRD 文件路径（.pdf/.txt/.md）")
+    g.add_argument("--out-dir", default="out", help="输出目录（默认 out/）")
+    g.add_argument("--thread-id", default="cli-run-1")
+    g.add_argument("--project-id", default="default")
+    g.add_argument("--no-png", action="store_true", help="不生成 PNG，仅产 .mmd 与 .md")
+    g.add_argument(
+        "--png-backend",
+        choices=["auto", "kroki", "mmdc"],
+        default="auto",
+        help="PNG 渲染后端（默认 auto = kroki 失败回落 mmdc）",
+    )
+    g.set_defaults(func=cmd_generate)
+
+    r = sub.add_parser("render", help="把已有的 .mmd 渲染成 PNG")
+    r.add_argument("mmd", help="mermaid 源文件路径")
+    r.add_argument("--out", help="PNG 输出路径（默认与源同名换 .png）")
+    r.add_argument(
+        "--backend",
+        choices=["auto", "kroki", "mmdc"],
+        default="auto",
+    )
+    r.set_defaults(func=cmd_render)
+
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
     return args.func(args)
 
 

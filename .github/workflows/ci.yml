@@ -23,9 +23,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install system graphviz (for pygraphviz)
-        run: sudo apt-get update && sudo apt-get install -y graphviz graphviz-dev
-
       - name: Install Poetry
         run: |
           pipx install poetry
@@ -40,27 +37,19 @@ jobs:
           path: .venv
           key: venv-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock', '**/pyproject.toml') }}
 
-      - name: Install dependencies (all extras + dev)
-        run: poetry install --all-extras --with dev --no-interaction
+      - name: Install dependencies (with dev)
+        run: poetry install --with dev --no-interaction
 
       - name: Lint (ruff check)
-        run: poetry run ruff check plot_agent
+        run: poetry run ruff check .
 
       - name: Format check (ruff format)
-        run: poetry run ruff format --check plot_agent
+        run: poetry run ruff format --check .
         continue-on-error: true
 
       - name: Type check (mypy)
-        run: poetry run mypy plot_agent
+        run: poetry run mypy
         continue-on-error: true
 
-      - name: Run offline unit tests
-        run: |
-          poetry run python -m plot_agent.tests.test_pipeline_offline
-          poetry run python -m plot_agent.tests.test_reflection_mock
-
-      - name: Run smoke (no API)
-        run: poetry run plot-agent smoke
-
-      - name: Run offline eval (templates only)
-        run: poetry run plot-agent-eval --no-llm
+      - name: Run tests
+        run: poetry run pytest

@@ -48,8 +48,13 @@ coverage.xml
 
 # ---- plot_agent outputs ----
 out/
+out_*/
 plot_agent_output/
 *.drawio.bkp
+
+# ---- IDE / Cursor / local agent state ----
+.cursor/
+agent-tools/
 
 # ---- jupyter ----
 .ipynb_checkpoints/

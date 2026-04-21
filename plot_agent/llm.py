@@ -1,135 +1,108 @@
-"""LLM 客户端 - 统一包装 OpenAI 兼容接口"""
+"""LLM 调用封装（Harness 层）。
+
+职责：
+- `call_structured`：LLM → JSON → Pydantic schema；解析失败做 repair；网络瞬态错误做指数退避重试。
+- 仍然失败 → 抛 `LLMCallError`，由上层（节点 / runner）决定如何处理。**不内置任何硬编码业务 fallback**。
+- 每个 agent 通过 `model_env` 指向 .env 中的键（PLANNER_MODEL / CRITIC_MODEL ...）。
+"""
 
 from __future__ import annotations
 
-import base64
 import json
+import logging
 import os
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+import time
+from typing import TypeVar
 
-from dotenv import load_dotenv
-from openai import OpenAI
+from pydantic import BaseModel, ValidationError
 
-load_dotenv()
+log = logging.getLogger("plot_agent.llm")
+
+T = TypeVar("T", bound=BaseModel)
+
+_DEFAULT_MODEL_ENV = "PLANNER_MODEL"
+_NETWORK_RETRIES = 3
+_NETWORK_BACKOFF = 2.0
 
 
-@dataclass
-class LLMConfig:
-    api_key: str | None = None
-    base_url: str | None = None
-    planner_model: str = "gpt-4o"
-    critic_model: str = "gpt-4o"
-    vlm_model: str = "gpt-4o"
+class LLMCallError(RuntimeError):
+    """LLM 调用或 schema 解析最终失败。"""
 
-    @classmethod
-    def from_env(cls) -> LLMConfig:
-        return cls(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_BASE_URL") or None,
-            planner_model=os.getenv("PLANNER_MODEL", "gpt-4o"),
-            critic_model=os.getenv("CRITIC_MODEL", "gpt-4o"),
-            vlm_model=os.getenv("VLM_MODEL", "gpt-4o"),
+
+def _resolve_model(model_env: str) -> str:
+    model = (
+        os.environ.get(model_env)
+        or os.environ.get("PLANNER_MODEL")
+        or os.environ.get("OPENAI_MODEL")
+    )
+    if not model:
+        raise LLMCallError(
+            f"No model configured. Set {model_env} or PLANNER_MODEL or OPENAI_MODEL."
         )
+    return model
 
 
-class LLMClient:
-    """封装 chat / json_chat / vlm_chat 三种模式"""
+def _invoke_llm(system: str, user: str, *, model_env: str = _DEFAULT_MODEL_ENV) -> str:
+    """调用 OpenAI Chat Completions，要求 JSON 输出；瞬态网络错误指数退避重试。"""
+    from openai import APIConnectionError, APITimeoutError, BadRequestError, OpenAI, RateLimitError
 
-    def __init__(self, config: LLMConfig | None = None) -> None:
-        self.config = config or LLMConfig.from_env()
-        self._client = OpenAI(
-            api_key=self.config.api_key,
-            base_url=self.config.base_url,
-        )
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise LLMCallError("OPENAI_API_KEY not set.")
 
-    def chat(
-        self,
-        system: str,
-        user: str,
-        *,
-        model: str | None = None,
-        temperature: float = 0.3,
-    ) -> str:
-        """普通文本对话"""
-        resp = self._client.chat.completions.create(
-            model=model or self.config.planner_model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=temperature,
-        )
-        return resp.choices[0].message.content or ""
+    client = OpenAI(api_key=api_key, base_url=os.environ.get("OPENAI_BASE_URL") or None)
+    model = _resolve_model(model_env)
 
-    def json_chat(
-        self,
-        system: str,
-        user: str,
-        *,
-        model: str | None = None,
-        temperature: float = 0.2,
-    ) -> dict[str, Any]:
-        """强制返回 JSON 对象"""
-        resp = self._client.chat.completions.create(
-            model=model or self.config.planner_model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=temperature,
-            response_format={"type": "json_object"},
-        )
-        raw = resp.choices[0].message.content or "{}"
+    messages = [
+        {"role": "system", "content": system + "\nYou MUST reply with a single valid JSON object only."},
+        {"role": "user", "content": user},
+    ]
+
+    last_err: Exception | None = None
+    for attempt in range(_NETWORK_RETRIES):
         try:
-            return json.loads(raw)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"LLM 返回非法 JSON: {raw[:500]}") from e
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    response_format={"type": "json_object"},
+                    messages=messages,
+                )
+            except BadRequestError as exc:
+                log.warning("model %s rejected response_format=json_object (%s); retry without", model, exc)
+                resp = client.chat.completions.create(model=model, messages=messages)
+            return resp.choices[0].message.content or ""
+        except (APIConnectionError, APITimeoutError, RateLimitError) as exc:
+            last_err = exc
+            wait = _NETWORK_BACKOFF * (2**attempt)
+            log.warning("LLM network error (%s), retry %d/%d after %.1fs", exc, attempt + 1, _NETWORK_RETRIES, wait)
+            time.sleep(wait)
 
-    def vlm_chat(
-        self,
-        system: str,
-        user: str,
-        image_paths: list[str | Path],
-        *,
-        model: str | None = None,
-        temperature: float = 0.2,
-        as_json: bool = True,
-    ) -> dict[str, Any] | str:
-        """多模态: 带图片的 chat, 用于 critic 看渲染截图"""
-        content: list[dict[str, Any]] = [{"type": "text", "text": user}]
-        for p in image_paths:
-            path = Path(p)
-            if not path.exists():
-                continue
-            b64 = base64.b64encode(path.read_bytes()).decode()
-            suffix = path.suffix.lower().lstrip(".") or "png"
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/{suffix};base64,{b64}",
-                    },
-                }
+    raise LLMCallError(f"LLM unavailable after {_NETWORK_RETRIES} retries: {last_err}")
+
+
+def call_structured(
+    schema: type[T],
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    max_repair: int = 2,
+    model_env: str = _DEFAULT_MODEL_ENV,
+) -> T:
+    """LLM → JSON → schema；解析失败重试 max_repair 次，仍失败抛 LLMCallError。"""
+    last_err: Exception | None = None
+    attempt_prompt = user_prompt
+    for attempt in range(max_repair + 1):
+        raw = _invoke_llm(system_prompt, attempt_prompt, model_env=model_env)
+        try:
+            return schema.model_validate(json.loads(raw))
+        except (json.JSONDecodeError, ValidationError) as exc:
+            last_err = exc
+            log.warning("call_structured repair %d/%d: %s", attempt + 1, max_repair + 1, exc)
+            attempt_prompt = (
+                f"{user_prompt}\n\nPrevious reply failed schema validation: {exc!s}. "
+                "Return ONLY valid JSON matching the schema."
             )
 
-        kwargs: dict[str, Any] = {
-            "model": model or self.config.vlm_model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": content},
-            ],
-            "temperature": temperature,
-        }
-        if as_json:
-            kwargs["response_format"] = {"type": "json_object"}
-
-        resp = self._client.chat.completions.create(**kwargs)
-        raw = resp.choices[0].message.content or ""
-        if as_json:
-            try:
-                return json.loads(raw or "{}")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"VLM 返回非法 JSON: {raw[:500]}") from e
-        return raw
+    raise LLMCallError(
+        f"{schema.__name__}: schema parse failed after {max_repair + 1} attempts: {last_err}"
+    )
