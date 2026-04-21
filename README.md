@@ -52,8 +52,21 @@ Most LLM diagramming projects ask a single model to plan and emit the final arti
 | `planner` | Read the BRD; build a Self-Q&A chain (frontend / backend / runtime / integration / deployment / secrets / database / open questions) | `TechPlan` |
 | `executors/{role}` × 5 | Read the plan, peer designs, and reviewer feedback; refine just this role | `ComponentDesign` |
 | `reviewer` | Check interface / dependency / deployment consistency; nominate a `target_role` | `ReviewReport` |
-| `mermaid_maker` | Designs → nodes / edges / groups | `MermaidIR` |
+| `mermaid_maker` | Designs → colour-coded nodes / semantic edges / subgraph groups, with optional iconify logos | `MermaidIR` |
 | `mermaid_renderer` | IR → `.mmd` + `summary.md` (+ optional PNG via Kroki / mmdc) | files |
+
+### Visual language emitted by `mermaid_maker`
+
+The IR carries semantic style hints so the PNG is readable at a glance:
+
+| Concept | Field | Values |
+| --- | --- | --- |
+| Node category | `style_class` | `external` / `internal` / `database` / `cache` / `queue` / `compute` / `secret` / `observability` / `ai` |
+| Official logos | `icon` | iconify key, e.g. `logos:postgresql`, `simple-icons:databricks`, `logos:kubernetes`, `logos:microsoft-azure` (whitelist in the planner prompt) |
+| Relationship kind | `style` | `solid` (sync) / `thick` (critical) / `dashed` (async / event) / `dotted` (logical / optional) |
+| Grouping | `subgraphs` | role-based clusters, including an `external` cluster for outside-org systems |
+
+`to_mermaid()` auto-emits `classDef` + `linkStyle` blocks so any Mermaid renderer (Kroki, mmdc, mermaid.live) produces the colour-coded output without extra config. Logo fidelity depends on the renderer being able to fetch the iconify CDN at render time; unreachable icons degrade gracefully to a label-only node.
 
 ---
 
